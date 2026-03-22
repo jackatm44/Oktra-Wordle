@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - email: string (required, email)
+    //   - username: string (required)
+    //   - totalScore: number (required)
+    //   - dailyScores: map (required)
+    //
+    // Collection: leaderboard
+    // Document ID: {userId}
+    // Fields:
+    //   - username: string (required)
+    //   - totalScore: number (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'username', 'totalScore', 'dailyScores']) &&
+             data.email is string &&
+             data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
+             data.totalScore is number &&
+             data.dailyScores is map;
+    }
+
+    function isValidLeaderboardEntry(data) {
+      return data.keys().hasAll(['username', 'totalScore']) &&
+             data.username is string &&
+             data.totalScore is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isValidUser(request.resource.data) && request.resource.data.totalScore == 0;
+      allow update: if isValidUser(request.resource.data) && request.resource.data.email == resource.data.email;
+    }
+
+    match /leaderboard/{userId} {
+      allow read: if true;
+      allow create, update: if isValidLeaderboardEntry(request.resource.data);
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

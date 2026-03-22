@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the Wordle app",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "username": { "type": "string" },
+        "totalScore": { "type": "number" },
+        "dailyScores": { 
+          "type": "object",
+          "description": "Map of date strings to DailyScore objects"
+        }
+      },
+      "required": ["email", "username", "totalScore", "dailyScores"]
+    },
+    "DailyScore": {
+      "title": "Daily Score",
+      "description": "A user's score for a specific day",
+      "type": "object",
+      "properties": {
+        "word": { "type": "string" },
+        "guesses": { "type": "array", "items": { "type": "string" } },
+        "score": { "type": "number" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["word", "guesses", "score", "completedAt"]
+    },
+    "LeaderboardEntry": {
+      "title": "Leaderboard Entry",
+      "description": "Public leaderboard data for a user",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "totalScore": { "type": "number" }
+      },
+      "required": ["username", "totalScore"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile data"
+    },
+    "/leaderboard/{userId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Public leaderboard data"
+    }
+  }
+}
