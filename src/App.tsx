@@ -10,6 +10,7 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   collection, 
   query, 
   where,
@@ -17,15 +18,24 @@ import {
   limit, 
   onSnapshot,
   increment,
-  runTransaction
+  runTransaction,
+  getDocs,
+  writeBatch
 } from 'firebase/firestore';
+import { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  onAuthStateChanged,
+  User as FirebaseUser
+} from 'firebase/auth';
 import { format, isAfter, isBefore, startOfDay, differenceInDays } from 'date-fns';
-import { Trophy, LogOut, Info, ChevronRight, Keyboard as KeyboardIcon, CheckCircle2, XCircle, Mail, Lock, User as UserIcon, Loader2 } from 'lucide-react';
+import { Trophy, LogOut, Info, ChevronRight, Keyboard as KeyboardIcon, CheckCircle2, XCircle, Mail, Lock, User as UserIcon, Loader2, Settings, Trash2, RotateCcw } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { WORDS_APRIL, TEST_WORD, SCORING, APRIL_START, APRIL_END } from './constants';
 
 // --- Utils ---
@@ -420,8 +430,9 @@ const AuthForm = ({ onAuthSuccess }: { onAuthSuccess: (user: { email: string; us
 
     const domain = '@oktra.co.uk';
     const trimmedEmail = email.trim().toLowerCase();
+    const isAdmin = trimmedEmail === 'jmccolm@oktra.co.uk';
     
-    if (!trimmedEmail.endsWith(domain)) {
+    if (!trimmedEmail.endsWith(domain) && !isAdmin) {
       setError('Please use your Oktra work email');
       setLoading(false);
       return;
@@ -487,6 +498,124 @@ const AuthForm = ({ onAuthSuccess }: { onAuthSuccess: (user: { email: string; us
   );
 };
 
+const AdminPanel = ({ onClose }: { onClose: () => void }) => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  useEffect(() => {
+    const q = query(collection(db, 'users'), orderBy('username'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleDeleteUser = async (email: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${email}?`)) return;
+    setActionLoading(true);
+    try {
+      await deleteDoc(doc(db, 'users', email));
+      await deleteDoc(doc(db, 'leaderboard', email));
+    } catch (err) {
+      console.error("Delete error:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResetAllScores = async () => {
+    if (!window.confirm("CRITICAL: This will reset EVERYONE'S score to 0. Are you sure?")) return;
+    setActionLoading(true);
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const batch = writeBatch(db);
+      
+      usersSnap.docs.forEach(userDoc => {
+        batch.update(userDoc.ref, {
+          totalScore: 0,
+          dailyScores: {}
+        });
+        batch.update(doc(db, 'leaderboard', userDoc.id), {
+          totalScore: 0
+        });
+      });
+      
+      await batch.commit();
+      alert("All scores have been reset.");
+    } catch (err) {
+      console.error("Reset error:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-[2.5rem] w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col shadow-2xl"
+      >
+        <div className="p-8 border-bottom border-zinc-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-medium tracking-tight">Admin Dashboard</h2>
+            <p className="text-sm text-zinc-400">Manage accounts and scores</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-zinc-100 rounded-full transition-all">
+            <XCircle className="w-6 h-6 text-zinc-300" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-8 space-y-6">
+          <div className="flex gap-4">
+            <button 
+              onClick={handleResetAllScores}
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-xl text-sm font-medium hover:bg-red-100 transition-all disabled:opacity-50"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset All Scores
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-4">Users ({users.length})</h3>
+            {loading ? (
+              <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-zinc-200" /></div>
+            ) : (
+              <div className="divide-y divide-zinc-50">
+                {users.map(u => (
+                  <div key={u.id} className="py-4 flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{u.username}</p>
+                      <p className="text-xs text-zinc-400">{u.email}</p>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <p className="text-sm font-bold">{u.totalScore}</p>
+                        <p className="text-[10px] text-zinc-400 uppercase font-bold">Points</p>
+                      </div>
+                      <button 
+                        onClick={() => handleDeleteUser(u.email)}
+                        disabled={actionLoading}
+                        className="p-2 text-zinc-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<{ email: string; username: string } | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -500,6 +629,7 @@ export default function App() {
   const [isEventEnded, setIsEventEnded] = useState(false);
   const [isEventNotStarted, setIsEventNotStarted] = useState(false);
   const [forceUnlock, setForceUnlock] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   const now = new Date();
   const todayStr = format(now, 'yyyy-MM-dd');
@@ -507,20 +637,18 @@ export default function App() {
   const dayOfApril = getDayOfApril(now);
   const solution = isTestingMode ? TEST_WORD.toUpperCase() : (WORDS_APRIL[dayOfApril - 1]?.toUpperCase() || '');
   const isUnlocked = isTodayUnlocked(now) || forceUnlock;
+  const isAdmin = user?.email === 'jmccolm@oktra.co.uk';
 
   // --- Effects ---
 
   useEffect(() => {
     const savedUser = localStorage.getItem('wordle_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
+    if (savedUser) setUser(JSON.parse(savedUser));
     setIsAuthLoading(false);
   }, []);
 
   useEffect(() => {
     if (isAfter(now, APRIL_END)) setIsEventEnded(true);
-    // Removed isEventNotStarted check to allow testing mode
   }, [now]);
 
   useEffect(() => {
@@ -557,7 +685,6 @@ export default function App() {
             setIsGameOver(true);
             setGameStatus(daily.score > 0 ? 'won' : 'lost');
           } else {
-            // Reset state for new day
             setDailyScore(null);
             setGuesses([]);
             setIsGameOver(false);
@@ -574,7 +701,7 @@ export default function App() {
 
   // --- Handlers ---
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem('wordle_user');
     setUser(null);
   };
@@ -733,9 +860,20 @@ export default function App() {
 
         {user ? (
           <div className="flex items-center gap-6">
+            {isAdmin && (
+              <button 
+                onClick={() => setShowAdmin(true)}
+                className="p-2.5 hover:bg-zinc-100 rounded-full transition-all active:scale-95"
+                title="Admin Panel"
+              >
+                <Settings className="w-4 h-4 text-zinc-400" />
+              </button>
+            )}
             <div className="text-right">
               <p className="text-sm font-medium tracking-tight">{user.username}</p>
-              <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">Player</p>
+              <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-bold">
+                {isAdmin ? 'Administrator' : 'Player'}
+              </p>
             </div>
             <button 
               onClick={handleLogout}
@@ -747,6 +885,8 @@ export default function App() {
           </div>
         ) : null}
       </header>
+
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
 
       <main className="pt-32 pb-24 px-8 max-w-7xl mx-auto">
         {!user ? (

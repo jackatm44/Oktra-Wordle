@@ -6,15 +6,15 @@ service cloud.firestore {
     // ===============================================================
     //
     // Collection: users
-    // Document ID: {userId}
+    // Document ID: {email}
     // Fields:
-    //   - email: string (required, email)
+    //   - email: string (required)
     //   - username: string (required)
     //   - totalScore: number (required)
     //   - dailyScores: map (required)
     //
     // Collection: leaderboard
-    // Document ID: {userId}
+    // Document ID: {email}
     // Fields:
     //   - username: string (required)
     //   - totalScore: number (required)
@@ -24,9 +24,14 @@ service cloud.firestore {
     // ===============================================================
     // Helper Functions
     // ===============================================================
+    
+    // NOTE: Since we are not using Firebase Auth (as requested), 
+    // we cannot verify identity on the server side. 
+    // These rules are trust-based.
+
     function isValidUser(data) {
       return data.keys().hasAll(['email', 'username', 'totalScore', 'dailyScores']) &&
-             data.email is string &&
+             data.email is string && data.email.size() < 100 &&
              data.username is string && data.username.size() > 0 && data.username.size() < 50 &&
              data.totalScore is number &&
              data.dailyScores is map;
@@ -34,7 +39,7 @@ service cloud.firestore {
 
     function isValidLeaderboardEntry(data) {
       return data.keys().hasAll(['username', 'totalScore']) &&
-             data.username is string &&
+             data.username is string && data.username.size() < 50 &&
              data.totalScore is number;
     }
 
@@ -46,11 +51,14 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidUser(request.resource.data) && request.resource.data.totalScore == 0;
       allow update: if isValidUser(request.resource.data) && request.resource.data.email == resource.data.email;
+      // Admin actions are handled by the client logic for now
+      allow delete: if true; 
     }
 
     match /leaderboard/{userId} {
       allow read: if true;
       allow create, update: if isValidLeaderboardEntry(request.resource.data);
+      allow delete: if true;
     }
 
     // Default deny

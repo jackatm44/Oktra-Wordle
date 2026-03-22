@@ -1,5 +1,5 @@
 {
-  "name": "Worlde",
-  "description": "",
+  "name": "Oktra Wordle",
+  "description": "A daily Wordle challenge for the Oktra team, featuring leaderboards and admin management.",
   "requestFramePermissions": []
 }
