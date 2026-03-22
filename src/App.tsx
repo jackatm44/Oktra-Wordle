@@ -84,6 +84,30 @@ const getUsernameFromEmail = (email: string) => {
   return email.split('@')[0];
 };
 
+const getUKDate = () => {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  });
+  const parts = formatter.formatToParts(now);
+  const map = new Map(parts.map(p => [p.type, p.value]));
+  
+  return new Date(
+    parseInt(map.get('year')!),
+    parseInt(map.get('month')!) - 1,
+    parseInt(map.get('day')!),
+    parseInt(map.get('hour')!),
+    parseInt(map.get('minute')!),
+    parseInt(map.get('second')!)
+  );
+};
+
 const getDayOfApril = (date: Date) => {
   const start = startOfDay(APRIL_START);
   const current = startOfDay(date);
@@ -92,7 +116,7 @@ const getDayOfApril = (date: Date) => {
 
 const isTodayUnlocked = (date: Date) => {
   const now = date;
-  const unlockTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0);
+  const unlockTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 0, 0);
   return isAfter(now, unlockTime);
 };
 
@@ -693,7 +717,7 @@ export default function App() {
   const [forceUnlock, setForceUnlock] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
 
-  const now = new Date();
+  const now = getUKDate();
   const todayStr = format(now, 'yyyy-MM-dd');
   const isTestingMode = isBefore(now, APRIL_START);
   const dayOfApril = getDayOfApril(now);
@@ -886,11 +910,24 @@ export default function App() {
 
   if (isEventEnded) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6 text-center">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-4xl font-bold mb-4 text-zinc-900">This event has ended</h1>
-          <p className="text-zinc-500">Thank you for participating in the April Edition.</p>
+      <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center py-24 px-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full text-center mb-16"
+        >
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mb-8 mx-auto shadow-sm">
+            <Trophy className="w-8 h-8 text-black" />
+          </div>
+          <h1 className="text-4xl font-medium mb-4 tracking-tight">The April Challenge has ended</h1>
+          <p className="text-zinc-400 leading-relaxed">
+            Thank you to everyone at Oktra who participated! Here are the final standings for the month.
+          </p>
         </motion.div>
+        
+        <div className="w-full max-w-md">
+          <Leaderboard users={leaderboard} />
+        </div>
       </div>
     );
   }
@@ -964,7 +1001,7 @@ export default function App() {
                   <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center mb-8 shadow-sm">
                     <Info className="w-5 h-5 text-zinc-300" />
                   </div>
-                  <h2 className="text-3xl font-medium mb-4 tracking-tight">Locked until 06:00</h2>
+                  <h2 className="text-3xl font-medium mb-4 tracking-tight">Locked until 07:00</h2>
                   <p className="text-zinc-400 leading-relaxed">Today's challenge is currently being prepared. Check back shortly.</p>
                   {isTestingMode && (
                     <button 
@@ -1017,7 +1054,7 @@ export default function App() {
                         </>
                       )}
                       <p className="text-xs text-zinc-400 font-medium mb-8 leading-relaxed">
-                        Challenge completed. Next word unlocks tomorrow at 06:00.
+                        Challenge completed. Next word unlocks tomorrow at 07:00.
                       </p>
                       {isTestingMode && (
                         <button 

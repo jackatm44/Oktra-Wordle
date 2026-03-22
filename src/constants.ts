@@ -20,4 +20,4 @@ export const SCORING = {
 };
 
 export const APRIL_START = new Date(2026, 3, 1); // April 1, 2026
-export const APRIL_END = new Date(2026, 3, 30, 23, 59, 59); // April 30, 2026
+export const APRIL_END = new Date(2026, 4, 1, 7, 0, 0); // May 1, 2026, 7:00 AM
