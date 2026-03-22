@@ -502,15 +502,30 @@ const AdminPanel = ({ onClose }: { onClose: () => void }) => {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [password, setPassword] = useState('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleAuthorize = (e: React.FormEvent) => {
+    e.preventDefault();
+    const correctPassword = (import.meta as any).env.VITE_ADMIN_PASSWORD || 'Oktra2024'; // Fallback for testing
+    if (password === correctPassword) {
+      setIsAuthorized(true);
+      setError('');
+    } else {
+      setError('Incorrect password');
+    }
+  };
 
   useEffect(() => {
+    if (!isAuthorized) return;
     const q = query(collection(db, 'users'), orderBy('username'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isAuthorized]);
 
   const handleDeleteUser = async (email: string) => {
     if (!window.confirm(`Are you sure you want to delete ${email}?`)) return;
@@ -550,6 +565,53 @@ const AdminPanel = ({ onClose }: { onClose: () => void }) => {
       setActionLoading(false);
     }
   };
+
+  if (!isAuthorized) {
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-[2.5rem] w-full max-w-sm p-10 shadow-2xl text-center"
+        >
+          <div className="mb-8 flex justify-center">
+            <div className="w-16 h-16 bg-zinc-50 rounded-2xl flex items-center justify-center">
+              <Lock className="w-8 h-8 text-black" />
+            </div>
+          </div>
+          <h2 className="text-2xl font-medium mb-2 tracking-tight">Admin Access</h2>
+          <p className="text-zinc-400 text-sm mb-8">Please enter the administrator password</p>
+          
+          <form onSubmit={handleAuthorize} className="space-y-4">
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-4 bg-zinc-50 border-none rounded-2xl focus:outline-none focus:ring-2 focus:ring-black/5 transition-all text-center"
+              autoFocus
+            />
+            {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 py-4 bg-zinc-100 text-zinc-600 font-medium rounded-2xl hover:bg-zinc-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex-1 py-4 bg-black text-white font-medium rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+              >
+                Unlock
+              </button>
+            </div>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
