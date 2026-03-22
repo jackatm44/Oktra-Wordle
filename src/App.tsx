@@ -249,13 +249,14 @@ const Intro = ({ onEnter }: { onEnter: () => void }) => {
             className="flex flex-col items-center w-full max-w-4xl px-6 z-20"
           >
             <motion.div 
-              className="relative w-48 h-48 mb-16 rounded-none overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] bg-white flex items-center justify-center"
+              className="relative w-48 h-48 mb-16 rounded-none overflow-hidden shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] bg-white flex items-center justify-center cursor-pointer group"
               layoutId="intro-image"
+              onClick={onEnter}
             >
               <img 
                 src="https://files.catbox.moe/pfq7ul.png" 
                 alt="Wordle" 
-                className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-1000"
+                className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000 group-hover:scale-105"
                 referrerPolicy="no-referrer"
               />
               <motion.div 
@@ -274,12 +275,9 @@ const Intro = ({ onEnter }: { onEnter: () => void }) => {
             >
               <button
                 onClick={onEnter}
-                className="group relative px-8 py-3.5 bg-zinc-900 text-white rounded-full text-sm font-medium tracking-wide transition-all hover:bg-black hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+                className="text-[10px] uppercase tracking-[0.3em] text-zinc-400 font-bold hover:text-zinc-900 transition-colors"
               >
-                <span className="relative z-10 flex items-center gap-2.5">
-                  Begin Challenge
-                  <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
-                </span>
+                Begin Challenge
               </button>
             </motion.div>
           </motion.div>
@@ -765,11 +763,18 @@ export default function App() {
         if (snapshot.exists()) {
           const data = snapshot.data();
           const daily = data.dailyScores?.[todayStr];
+          const progress = data.currentProgress;
+          
           if (daily) {
             setDailyScore(daily);
             setGuesses(daily.guesses);
             setIsGameOver(true);
             setGameStatus(daily.score > 0 ? 'won' : 'lost');
+          } else if (progress && progress.date === todayStr) {
+            setGuesses(progress.guesses);
+            setIsGameOver(false);
+            setGameStatus('playing');
+            setDailyScore(null);
           } else {
             setDailyScore(null);
             setGuesses([]);
@@ -813,7 +818,8 @@ export default function App() {
         
         transaction.update(userRef, {
           dailyScores: updatedDailyScores,
-          totalScore: increment(-scoreToRemove)
+          totalScore: increment(-scoreToRemove),
+          currentProgress: null
         });
         transaction.update(leaderboardRef, {
           totalScore: increment(-scoreToRemove)
@@ -858,7 +864,8 @@ export default function App() {
               score,
               completedAt: new Date().toISOString()
             },
-            totalScore: increment(score)
+            totalScore: increment(score),
+            currentProgress: null
           });
           
           transaction.update(leaderboardRef, {
@@ -880,6 +887,17 @@ export default function App() {
     } else {
       setGuesses(newGuesses);
       setCurrentGuess('');
+      
+      // Save progress to Firestore
+      if (user) {
+        const userRef = doc(db, 'users', user.email);
+        updateDoc(userRef, {
+          currentProgress: {
+            date: todayStr,
+            guesses: newGuesses
+          }
+        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `users/${user.email}`));
+      }
     }
   }, [currentGuess, guesses, isGameOver, user, solution, todayStr]);
 
