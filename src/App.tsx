@@ -1040,9 +1040,12 @@ export default function App() {
                     <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-400 font-bold mb-3">
                       {isTestingMode ? 'Pre-Launch Test' : `Challenge ${dayOfApril}`}
                     </p>
-                    <h2 className="text-4xl md:text-5xl font-medium tracking-tighter">
+                    <h2 className="text-4xl md:text-5xl font-medium tracking-tighter mb-6">
                       {isTestingMode ? format(now, 'MMMM do') : `April ${dayOfApril}`}
                     </h2>
+                    <p className="text-sm text-zinc-500 max-w-md mx-auto leading-relaxed">
+                      When a block turns grey, it means the letter is correct but in the wrong position; when a block turns black, it means the letter is correct and in the right position.
+                    </p>
                   </motion.div>
 
                   <WordleGrid 
